@@ -75,6 +75,65 @@ def get_current_lr(optimizer):
         return param_group["lr"]
 
 
+def compute_test(metrics, model, dl, dev, output_dir):
+    metric_values_dict = {}
+    # results_predicted = model.score(torch.tensor(dl.dataset.X_by_qid, dtype=torch.float, device=dev),
+    #                                 torch.tensor(dl.dataset.y_by_qid, device=dev) == PADDED_Y_VALUE, None)
+    num_queries = len(dl.dataset.X_by_qid)
+
+    path_predictions = os.path.join(output_dir, "model.predict.txt")
+    with open(path_predictions, 'w') as fo_predictions:
+        all_results_metric = {}
+
+        for metric_name, ats in metrics.items():
+            metrics_names = ["{metric_name}_{at}".format(metric_name=metric_name, at=at) for at in ats]
+            for m in metrics_names:
+                all_results_metric.setdefault(m, [])
+                path_metric_m = os.path.join(output_dir, "model.predict." + m + ".txt")
+                fm = open(path_metric_m, "w")
+                fm.close()
+
+        for num_query in range(num_queries):
+            temp_querie_x_tensor = torch.tensor([dl.dataset.X_by_qid[num_query]], dtype=torch.float, device=dev)
+            temp_querie_x_tensor[torch.isnan(temp_querie_x_tensor)] = 0
+            results_predicted = model.score(temp_querie_x_tensor,
+                        torch.tensor([dl.dataset.y_by_qid[num_query]], device=dev) == PADDED_Y_VALUE, None)
+
+            test_pred_numpy = results_predicted.cpu().numpy()
+
+            for i in test_pred_numpy:
+                for l in i:
+                    fo_predictions.write(str(l) + "\n")
+                # i_to_s = f"{i}\n".replace("[", "").replace("]", "").replace(" ", "")
+                # fo.write(i_to_s)
+
+            for metric_name, ats in metrics.items():
+                if "ndcg" in metric_name:
+                    metric_func = getattr(metrics_module, metric_name)
+                    metric_func_with_ats = partial(metric_func, ats=ats)
+                    # metrics_values2 = metric_on_epoch(metric_func_with_ats, model, dl, dev)
+                    results_metric = metric_func_with_ats(results_predicted, torch.tensor([dl.dataset.y_by_qid[num_query]], device=dev))
+
+
+                    metrics_names = ["{metric_name}_{at}".format(metric_name=metric_name, at=at) for at in ats]
+                    for name, result in zip(metrics_names, results_metric.cpu().numpy().T):
+                        path_predictions_metric = os.path.join(output_dir, "model.predict." + name + ".txt")
+                        with open(path_predictions_metric, 'a') as fo:
+                            for i in result:
+                                fo.write(str(i) + "\n")
+                        all_results_metric[name].append(result)
+
+        for m in all_results_metric:
+            if "ndcg" in m:
+                metric_values_dict.setdefault(m, np.mean(all_results_metric[m]))
+        # metrics_values = torch.mean(
+        #     results_metric, dim=0
+        # ).cpu().numpy()
+        # metrics_names = ["{metric_name}_{at}".format(metric_name=metric_name, at=at) for at in ats]
+        # metric_values_dict.update(dict(zip(metrics_names, metrics_values)))
+
+    return metric_values_dict
+
 def fit(epochs, model, loss_func, optimizer, scheduler, train_dl, valid_dl, config,
         gradient_clipping_norm, early_stopping_patience, device, output_dir, tensorboard_output_path):
     tensorboard_summary_writer = TensorboardSummaryWriter(tensorboard_output_path)
@@ -127,6 +186,9 @@ def fit(epochs, model, loss_func, optimizer, scheduler, train_dl, valid_dl, conf
                 scheduler.step(*args)
             else:
                 scheduler.step()
+
+        with torch.no_grad():
+            compute_test(config.metrics, model, valid_dl, device, output_dir)
 
         early_stop.step(current_val_metric_value, epoch)
         if early_stop.stop_training(epoch):
