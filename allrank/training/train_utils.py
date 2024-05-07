@@ -75,13 +75,13 @@ def get_current_lr(optimizer):
         return param_group["lr"]
 
 
-def compute_test(metrics, model, dl, dev, output_dir):
+def compute_test(metrics, model, dl, dev, output_dir, epoch):
     metric_values_dict = {}
     # results_predicted = model.score(torch.tensor(dl.dataset.X_by_qid, dtype=torch.float, device=dev),
     #                                 torch.tensor(dl.dataset.y_by_qid, device=dev) == PADDED_Y_VALUE, None)
     num_queries = len(dl.dataset.X_by_qid)
 
-    path_predictions = os.path.join(output_dir, "model.predict.txt")
+    path_predictions = os.path.join(output_dir, str(epoch) + ".model.predict.txt")
     with open(path_predictions, 'w') as fo_predictions:
         all_results_metric = {}
 
@@ -188,7 +188,7 @@ def fit(epochs, model, loss_func, optimizer, scheduler, train_dl, valid_dl, conf
                 scheduler.step()
 
         with torch.no_grad():
-            compute_test(config.metrics, model, valid_dl, device, output_dir)
+            compute_test(config.metrics, model, valid_dl, device, output_dir, epoch)
 
         early_stop.step(current_val_metric_value, epoch)
         if early_stop.stop_training(epoch):
