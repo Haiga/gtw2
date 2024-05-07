@@ -89,7 +89,7 @@ def compute_test(metrics, model, dl, dev, output_dir, epoch):
             metrics_names = ["{metric_name}_{at}".format(metric_name=metric_name, at=at) for at in ats]
             for m in metrics_names:
                 all_results_metric.setdefault(m, [])
-                path_metric_m = os.path.join(output_dir, "model.predict." + m + ".txt")
+                path_metric_m = os.path.join(output_dir, str(epoch) + ".model.predict." + m + ".txt")
                 fm = open(path_metric_m, "w")
                 fm.close()
 
@@ -117,7 +117,7 @@ def compute_test(metrics, model, dl, dev, output_dir, epoch):
 
                     metrics_names = ["{metric_name}_{at}".format(metric_name=metric_name, at=at) for at in ats]
                     for name, result in zip(metrics_names, results_metric.cpu().numpy().T):
-                        path_predictions_metric = os.path.join(output_dir, "model.predict." + name + ".txt")
+                        path_predictions_metric = os.path.join(output_dir, str(epoch) + ".model.predict." + name + ".txt")
                         with open(path_predictions_metric, 'a') as fo:
                             for i in result:
                                 fo.write(str(i) + "\n")
