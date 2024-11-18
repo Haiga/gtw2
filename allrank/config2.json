@@ -22,7 +22,6 @@
     },
     "data": {
       "path": "/content",
-        "pathOld": "/root/.pytorchltr_datasets/MSLR30K/Fold1",
       "validation_ds_role": "test",
       "num_workers": 1,
       "batch_size": 64,
